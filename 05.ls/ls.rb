@@ -12,33 +12,33 @@ def main
 
   opt.parse!(ARGV)
   # カレントディレクトリ内のファイルを取得して配列に格納する
-  files = Dir.foreach('.').to_a
+  files_name = Dir.foreach('.').to_a
   # aオプションが付けられていない場合は、先頭にピリオドがあるファイルを配列から除外する
-  files = files.filter { |file_name| !file_name.start_with?('.') } unless params[:a]
+  files_name = files_name.filter { |file_name| !file_name.start_with?('.') } unless params[:a]
   # 取得したファイル名を昇順にソート
-  files = files.sort.to_a
+  files_name = files_name.sort.to_a
 
   # rオプションが付与されている場合は、配列を逆順にソートする
-  files = files.reverse.to_a if params[:r]
+  files_name = files_name.reverse.to_a if params[:r]
 
   if params[:l]
     # lオプションが付与されている場合は、ファイルの各情報を出力する処理を行う
-    l_option(files)
+    l_option(files_name)
   else
     # lオプションが付与されていない場合は、ファイル名のみを表示する処理を行う
-    none_l_option(files)
+    none_l_option(files_name)
   end
 end
 
 # lオプションの処理を行うメソッド
-def l_option(files)
+def l_option(file_names)
   # ファイル名を格納した配列の各要素のFile::Statインスタンスを作成し、新しい配列に格納
-  files_class = files.map do |file|
+  files = file_names.map do |file|
     File::Stat.new(file)
   end
 
   # クラス配列内の各インスタンスのファイルモードを8進数に変換し、配列に格納
-  files_mode_tos8 = filesmode_tos8conversion(files_class)
+  files_mode_tos8 = filesmode_tos8conversion(files)
 
   # 取得したファイルモード(8進数)から権限を取得する
   owner_authority = []            # 所有者権限
@@ -54,61 +54,53 @@ def l_option(files)
 
   owner_authority = make_authority(owner_authority)
   owner_group_authority = make_authority(owner_group_authority)
-  owner_group_authority = make_authority(other_authority)
-
+  other_authority = make_authority(other_authority)
   # ファイルモードの8進数上位2桁の値によって、ファイルの種類を判定
-  file_type = file_type_judge(files_class)
+  file_type = file_type_judge(files)
 
   j = 0
   # ファイルモードを連結してパーミッションを作成し配列に格納
   files_permission = []
-  files.length.times do
+  file_names.length.times do
     files_permission[j] = file_type[j] + owner_authority[j] + owner_group_authority[j] + other_authority[j]
     j += 1
   end
 
   # ファイルのハードリンク数、 ユーザー名、グループ名、ファイルサイズ、タイムスタンプを取得し配列に格納
-  files_hardlink = files_class.map(&:nlink)
-  files_username = files_class.map do |file|
+  files_hardlink = files.map(&:nlink)
+  files_username = files.map do |file|
     Etc.getpwuid(file.uid).name
   end
-  files_groupname = files_class.map do |file|
+  files_groupname = files.map do |file|
     Etc.getgrgid(file.gid).name
   end
-  files_size = files_class.map(&:size)
-  files_time = files_class.map(&:mtime)
+  files_size = files.map(&:size)
+  files_time = files.map(&:mtime)
 
   # ファイルのブロック数の合計を求める
-  file_block = files_class.sum(&:blocks)
+  file_block = files.sum(&:blocks)
 
   # ファイルの各情報を出力
-  l_option_output(files, file_block, files_permission,
+  l_option_output(file_names, file_block, files_permission,
                   files_hardlink, files_username, files_groupname, files_size, files_time)
 end
 
 # ファイルモードを8進数に変換するメソッド
-def filesmode_tos8conversion(files_class)
-  files_mode_tos8 = []
-  i = 0
-  files_class.each do |file|
-    files_mode_tos8[i] =
-      if file.mode.to_s(8).length == 5
-        # ファイルモードが5桁の場合は、先頭に0を付ける
-        [0.to_s, file.mode.to_s(8)].join
-      else
-        files_mode_tos8[i] = file.mode.to_s(8)
-      end
-    i += 1
+def filesmode_tos8conversion(files)
+  files.map do |file|
+    if file.mode.to_s(8).length == 5
+      # ファイルモードが5桁の場合は、先頭に0を付ける
+      [0.to_s, file.mode.to_s(8)].join
+    else
+      file.mode.to_s(8)
+    end
   end
-  files_mode_tos8
 end
 
 # 取得したファイルモードからファイルの種類を判定するメソッド
-def file_type_judge(files_class)
-  file_type = []
+def file_type_judge(files)
   file_type_hush = { '04' => 'd', '10' => '-', '12' => 'l' }
-  i = 0
-  files_class.each do |file|
+  files.map do |file|
     # ファイルモードの上位2桁を取得
     top_2digit =
       if file.mode.to_s(8).length == 5
@@ -118,26 +110,21 @@ def file_type_judge(files_class)
         file.mode.to_s(8)[0, 2]
       end
     # ハッシュから上位2桁の値に応じたファイルの種類を取得
-    file_type[i] = file_type_hush[top_2digit]
-    i += 1
+    file_type_hush[top_2digit]
   end
-  file_type
 end
 
 # 権限を表す数値(8進数)を2進数に変換したのち、対応に基づいて権限の記号を付与するメソッド
 def make_authority(authority)
-  i = 0
   authority_hush = { '0' => '---', '1' => '--x', '10' => '-w-', '11' => '-wx', '100' => 'r--',
                      '101' => 'r-x', '110' => 'rw-', '111' => 'rwx' }
-  authority.each do |item|
-    authority[i] = authority_hush[(item.to_i).to_s(2)]
-    i += 1
+  authority.map do |item|
+    authority_hush[(item.to_i).to_s(2)]
   end
-  authority
 end
 
 # lオプションの結果と同じような形式でファイルの情報を出力するメソッド
-def l_option_output(arrays, file_block, files_permission,
+def l_option_output(file_names, file_block, files_permission,
                     files_hardlink, files_username, files_groupname,
                     files_size, files_time)
   i = 0
@@ -145,7 +132,7 @@ def l_option_output(arrays, file_block, files_permission,
   nowis = Time.new
   # ブロック数を出力
   puts ['total ', file_block.to_s].join
-  arrays.length.times do
+  file_names.length.times do
     output = [files_permission[i], '  '].join
     output = [output, files_hardlink[i].to_s, '  '].join
     output = [output, files_username[i], '  '].join
@@ -172,7 +159,7 @@ def l_option_output(arrays, file_block, files_permission,
           [output, files_time[i].min.to_s].join
         end
     end
-    output = [output, ' ', arrays[i]].join
+    output = [output, ' ', file_names[i]].join
     puts output
     i += 1
   end
@@ -208,22 +195,20 @@ end
 
 # lオプションを付けない場合にファイル名を出力するメソッド
 def none_l_option_output(files, column)
-  index = 0
-  while index < files.size
+  # nilの要素は配列から除外する
+  files = files.map(&:compact)
+  files.each do |file|
     i = 1
-    # nilの要素は配列から除外する
-    files = files.map { |file| file.filter { |f| !f.nil? } }
-    output = files[index][0].ljust(15, ' ')
+    output = file[0].ljust(15, ' ')
     while i < column
-      unless files[index][i].nil?
+      unless file[i].nil?
         # この条件がないと、ファイル数が1列あたりの行数未満の場合にエラーが出る
-        output += [' ', files[index][i].ljust(15, ' ')].join
+        output += [' ', file[i].ljust(15, ' ')].join
       end
       i += 1
     end
     print(output)
     print("\n")
-    index += 1
   end
 end
 
