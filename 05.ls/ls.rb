@@ -133,34 +133,32 @@ def l_option_output(file_names, file_block, files_permission,
   # ブロック数を出力
   puts ['total ', file_block.to_s].join
   file_names.length.times do
-    output = [files_permission[i], '  '].join
-    output = [output, files_hardlink[i].to_s, '  '].join
-    output = [output, files_username[i], '  '].join
-    output = [output, files_groupname[i], '  '].join
-    output = [output, files_size[i].to_s, ' '].join
-    output = [output, files_time[i].month.to_s, ' '].join
-    output = [output, files_time[i].day.to_s, ' '].join
+    outputs = []
+    outputs << files_permission[i] << files_hardlink[i] << files_username[i]
+    outputs << files_groupname[i] << files_size[i].to_s << files_time[i].month.to_s
+    outputs << files_time[i].day.to_s
     if nowis.year != files_time[i].year
       # タイムスタンプの年と、現在の年が異なっている場合は時間ではなく年を表示
-      output = [output, files_time[i].year.to_s, ' '].join
+      outputs << files_time[i].year.to_s
     else
       # タイムスタンプの年と、現在の年が同じの場合は時間、分を出力
       # タイムスタンプの時間と分が一桁の場合は、0を付けて出力
-      output =
+      hour =
         if files_time[i].hour.to_s.length == 1
-          [output, '0', files_time[i].hour.to_s, ':'].join
+          ['0', files_time[i].hour.to_s, ':'].join
         else
-          [output, files_time[i].hour.to_s, ':'].join
+          [files_time[i].hour.to_s, ':'].join
         end
-      output =
+      min =
         if files_time[i].min.to_s.length == 1
-          [output, '0', files_time[i].min.to_s].join
+          ['0', files_time[i].min.to_s].join
         else
-          [output, files_time[i].min.to_s].join
+          [files_time[i].min.to_s].join
         end
+      outputs << [hour, min].join
     end
-    output = [output, ' ', file_names[i]].join
-    puts output
+    outputs << file_names[i]
+    puts outputs.join(' ')
     i += 1
   end
 end
@@ -194,18 +192,13 @@ def none_l_option(files)
 end
 
 # lオプションを付けない場合にファイル名を出力するメソッド
-def none_l_option_output(files, column)
+def none_l_option_output(files, _column)
   # nilの要素は配列から除外する
   files = files.map(&:compact)
   files.each do |file|
-    i = 1
-    output = file[0].ljust(15, ' ')
-    while i < column
-      unless file[i].nil?
-        # この条件がないと、ファイル数が1列あたりの行数未満の場合にエラーが出る
-        output += [' ', file[i].ljust(15, ' ')].join
-      end
-      i += 1
+    output = ''
+    file.each do |f|
+      output += [f.ljust(15, ' ')].join
     end
     print(output)
     print("\n")
