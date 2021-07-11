@@ -7,16 +7,16 @@ opt.on('-l') { |v| params[:l] = v }
 opt.parse!(ARGV)
 files_argv = ARGV
 
-word_count = byte_count = 0
-line_total = word_total = size_total = 0
 if files_argv.empty?
   # コマンドライン引数がない場合、標準入力からの入力を受け付ける
   standard_inputs = []
-  while stdin = $stdin.gets
+  while (stdin = $stdin.gets)
     standard_inputs << stdin.split
   end
 
   # 標準入力から入力された文字列の単語数、バイト数を数える
+  word_count = 0
+  byte_count = 0
   standard_inputs.each do |input|
     word_count += input.length
     byte_count += input.join(' ').size
@@ -24,15 +24,16 @@ if files_argv.empty?
   byte_count += standard_inputs.length
   puts "       #{standard_inputs.size}       #{word_count}      #{byte_count}"
 else
-
   # ファイルの行数、単語数、バイト数、ファイル名を表示する処理
-  i = 0
+  line_total = 0
+  word_total = 0
+  size_total = 0
   files_argv.each do |file_name|
     File.open(file_name) do |f|
-      line_count = word_count = size_count = 0
+      line_count = size_count = 0
       # ファイルから1行ずつ取り出して処理を行う
+      word_count = 0
       f.each_line do |line|
-        p line.size
         size_count += line.size
 
         # 行末の改行文字を取り除く
@@ -51,12 +52,11 @@ else
       size_total += size_count
       if params[:l]
         # -lオプションが付与されている場合は、行数とファイル名のみ表示
-        puts "       #{line_count} #{files_argv[i]}"
+        puts "       #{line_count} #{file_name}"
       else
         # オプションなしの場合は行数、単語数、バイト数、ファイル名を表示
-        puts "       #{line_count}       #{word_count}      #{size_count} #{files_argv[i]}"
+        puts "       #{line_count}       #{word_count}      #{size_count} #{file_name}"
       end
-      i += 1
     end
   end
 
